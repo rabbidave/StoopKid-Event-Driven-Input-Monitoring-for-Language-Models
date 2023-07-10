@@ -1,6 +1,6 @@
 ## Stoop Kid: Event Driven Input Monitoring for Language Models
 
-### A set serverless functions designed to assisnt in the monitoring of inputs to languagement models, including routine and specific inspection of the message queue, and event-driven triggering of more complex metric calculation based on configurable condidtions
+### A set serverless functions designed to assist in the monitoring of inputs to languagement models, including routine and specific inspection of the message queue, and event-driven triggering of more complex metric calculation based on configurable condidtions
 
 #
 Rationale:
