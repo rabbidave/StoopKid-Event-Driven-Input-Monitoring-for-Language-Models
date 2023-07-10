@@ -9,6 +9,8 @@ import os
 import tempfile
 from botocore.exceptions import ClientError
 import datetime
+import redis
+import pickle
 
 # Define constants
 COSINE_SIMILARITY_THRESHOLD = 0.8
@@ -19,10 +21,13 @@ S3_BUCKET_NAME = 'my-bucket'
 BASELINE_FILE_KEY = 'baseline.csv'
 MAX_PAYLOAD_SIZE = 1000000  # Define a suitable max payload size
 RETRY_COUNT = 3  # Define a suitable retry count
+REDIS_HOST = 'localhost'  # Replace with your Redis host
+REDIS_PORT = 6379  # Replace with your Redis port
 
-# Initialize boto3 clients
+# Initialize boto3 and redis clients
 s3 = boto3.client('s3')
 sqs = boto3.client('sqs')
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT)
 
 # Load the baseline DataFrame from S3
 obj = s3.get_object(Bucket=S3_BUCKET_NAME, Key=BASELINE_FILE_KEY)
@@ -51,21 +56,43 @@ def split_dataframe(df, chunk_size=10000):  # Define a suitable chunk size
     chunks = [df[i:i+chunk_size] for i in range(0, df.shape[0], chunk_size)]
     return chunks
 
+def store_dataframe(df):
+    # Convert DataFrame to bytes
+    df_bytes = pickle.dumps(df)
+    # Store bytes in Redis
+    r.set(df['timestamp'].to_string(), df_bytes)
+
+def retrieve_dataframe(start_time):
+    # Get all keys in Redis
+    keys = r.keys()
+    df_list = []
+    for key in keys:
+        # Convert key to datetime
+        key_datetime = datetime.datetime.strptime(key.decode(), '%Y-%m-%d %H:%M:%S.%f')
+        # If key is within the last 5 minutes, retrieve the DataFrame
+        if key_datetime >= start_time:
+            df_bytes = r.get(key)
+            df = pickle.loads(df_bytes)
+            df_list.append(df)
+    # Concatenate all DataFrames into one DataFrame
+    df_last_5_minutes = pd.concat(df_list)
+    return df_last_5_minutes
+
 def process_data(df):
     def process_small_dataframe(df):
         # Add a timestamp to each message
         df['timestamp'] = datetime.datetime.now()
 
-        # Store the dataframe in a persistent storage system (e.g., DynamoDB or S3)
+        # Store the dataframe in Redis
         store_dataframe(df)
 
-        # Retrieve all messages from the last 30 seconds
-        start_time = datetime.datetime.now() - datetime.timedelta(seconds=30)
-        df_last_30_seconds = retrieve_dataframe(start_time)
+        # Retrieve all messages from the last 5 minutes
+        start_time = datetime.datetime.now() - datetime.timedelta(minutes=5)
+        df_last_5_minutes = retrieve_dataframe(start_time)
 
-        # Calculate the cosine similarity for the last 30 seconds worth of messages
+        # Calculate the cosine similarity for the last 5 minutes worth of messages
         vectorizer = TfidfVectorizer()
-        tfidf_matrix = vectorizer.fit_transform(df_last_30_seconds['text'])
+        tfidf_matrix = vectorizer.fit_transform(df_last_5_minutes['text'])
         cosine_sim = cosine_similarity(tfidf_matrix)
 
         if cosine_sim.mean() >= COSINE_SIMILARITY_THRESHOLD:
