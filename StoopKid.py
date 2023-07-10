@@ -1,4 +1,7 @@
-# My thanks to all the 
+# My thanks to all the open-source community folks; LLMs brought a GNU revival
+# In particular thanks to the folks at Arize AI; they have awesome products, people, and sessions designed to make a weird future less hard
+# the colab notebook that inspired this weird joke/serverless function: https://colab.research.google.com/github/Arize-ai/phoenix/blob/main/tutorials/llm_summarization_tutorial.ipynb#scrollTo=mHnJxxzCLGhr
+# the reference for non 90's kids: https://heyarnold.fandom.com/wiki/Stoop_Kid_(character)
 
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
