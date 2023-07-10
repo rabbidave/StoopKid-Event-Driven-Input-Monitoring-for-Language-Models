@@ -12,10 +12,7 @@ import time
 import json
 
 # Define constants
-# Stoop Kid sits on his stoop all day, making sure he has correctly configured constants
-QUEUE_SIZE_THRESHOLD = 100
-TIME_WINDOW = 60 * 60
-EVENT_THRESHOLD = 1000
+# Stoop Kid sits on his stoop all day, making sure he has correctly configured constants; but no longer sits in an infinite loop waiting for messages per Lambda best practices
 COSINE_SIMILARITY_THRESHOLD = 0.8
 ROUGE_L_THRESHOLD = 0.3
 SQS_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue'
@@ -47,7 +44,7 @@ def trigger_alert_function(df):
     }
     sqs.send_message(**message)
 
-# Mostly Stoop Kid just sits on his stoop and watches folks go by, making sure they're not up to anything
+# Mostly Stoop Kid just sits on his stoop and watches folks go by (when triggered by SQS), making sure they're not up to anything
 def process_data(df):
     vectorizer = TfidfVectorizer()
     tfidf_matrix = vectorizer.fit_transform(df['text'])
@@ -60,23 +57,20 @@ def process_data(df):
         if df['rougeL_score'].mean() < ROUGE_L_THRESHOLD:
             trigger_alert_function(df)
 
-# Stoop Kid also make sure he's correctly configured his timeouts and number of simultaneous events
+# Stoop Kid also make sure he's correctly configured his timeouts and number of simultaneous events; visibility timeout arbitrarily set to 60 seconds because why not, it's a POC
 def receive_message():
     response = sqs.receive_message(
         QueueUrl=SQS_QUEUE_URL,
         AttributeNames=['All'],
-        MaxNumberOfMessages=100,
+        MaxNumberOfMessages=10,
         MessageAttributeNames=['All'],
-        VisibilityTimeout=30,
+        VisibilityTimeout=60,
         WaitTimeSeconds=20
     )
     return response
 
-# Stoop Kid likes to correctly manage his serverless function based on the configured constants and conditional logic
+# Stoop Kid likes to correctly manage his serverless function based on the configured constants, no longer bound by conditional logic i.e. "Process all the things!"
 def lambda_handler(event, context):
-    last_processed_time = time.time()
-    event_count = 0
-
     while True:
         response = receive_message()
 
@@ -87,12 +81,7 @@ def lambda_handler(event, context):
                 body = json.loads(message['Body'])
                 df = pd.DataFrame(body)
 
-                current_time = time.time()
-                event_count += 1
-                if len(df) >= QUEUE_SIZE_THRESHOLD or (current_time - last_processed_time) >= TIME_WINDOW or event_count >= EVENT_THRESHOLD:
-                    process_data(df)
-                    last_processed_time = current_time
-                    event_count = 0
+                process_data(df)
 
                 # Delete message after successful processing
                 sqs.delete_message(
@@ -100,4 +89,5 @@ def lambda_handler(event, context):
                     ReceiptHandle=receipt_handle
                 )
         else:
-            time.sleep(1)
+            # No more messages in the queue, terminate the function
+            break

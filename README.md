@@ -9,4 +9,4 @@ Rationale:
 2) User experience is crucial to the adoption of LLMs for orchestration of multi-modal agentic systems; a high cosine similarity paired with a low rouge-L could indicate poor generalization, not just an attack
 3) More to come
 
-Note: Needs logging and error-handling; this is mostly conceptual at the moment
+Note: Needs logging and error-handling; this is mostly conceptual at the moment and assumes the use of environment variables rather than hard-coded values
