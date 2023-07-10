@@ -1,8 +1,3 @@
-# My thanks to all the open-source community folks; LLMs brought a GNU revival
-# In particular thanks to the folks at Arize AI; they have awesome products, people, and sessions designed to make a weird future less hard
-# the colab notebook that inspired this weird joke/serverless function: https://colab.research.google.com/github/Arize-ai/phoenix/blob/main/tutorials/llm_summarization_tutorial.ipynb#scrollTo=mHnJxxzCLGhr
-# the reference for non 90's kids: https://heyarnold.fandom.com/wiki/Stoop_Kid_(character)
-
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -10,54 +5,87 @@ from rouge_score import rouge_scorer
 import boto3
 import time
 import json
+import os
+import tempfile
+from botocore.exceptions import ClientError
+import datetime
 
 # Define constants
-# Stoop Kid sits on his stoop all day, making sure he has correctly configured constants; but no longer sits in an infinite loop waiting for messages per Lambda best practices
 COSINE_SIMILARITY_THRESHOLD = 0.8
 ROUGE_L_THRESHOLD = 0.3
 SQS_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue'
 ALERT_SQS_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/123456789012/MySecondQueue'
 S3_BUCKET_NAME = 'my-bucket'
 BASELINE_FILE_KEY = 'baseline.csv'
+MAX_PAYLOAD_SIZE = 1000000  # Define a suitable max payload size
+RETRY_COUNT = 3  # Define a suitable retry count
 
 # Initialize boto3 clients
-# Stoop Kid also makes sure he's got runners, ears on the ground, and a way to get information out to the neighborhood
 s3 = boto3.client('s3')
 sqs = boto3.client('sqs')
 
 # Load the baseline DataFrame from S3
-# Stoop Kid knows the neighborhood and makes sure he drops the latest details in a storage layer that has downstream event hooks
 obj = s3.get_object(Bucket=S3_BUCKET_NAME, Key=BASELINE_FILE_KEY)
 baseline_df = pd.read_csv(obj['Body'])
 
-# Sometimes Stoop Kid needs to look closely at people walking by; some folks like to cause trouble
 def compute_rougeL_scores(df: pd.DataFrame, baseline_df: pd.DataFrame) -> pd.Series:
     scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
     scores = df.apply(lambda row: scorer.score(row['summary'], baseline_df['reference_summary'])['rougeL'].fmeasure, axis=1)
     return scores
 
-# Sometimes Stoop Kid even needs to get off his stoop to help the neighborhood
+# Compute Rouge-L scores for the baseline dataframe once and reuse the result
+baseline_rougeL_score = compute_rougeL_scores(baseline_df, baseline_df)
+
 def trigger_alert_function(df):
-    message = {
-        'MessageBody': df.to_json(),
-        'QueueUrl': ALERT_SQS_QUEUE_URL
-    }
-    sqs.send_message(**message)
+    try:
+        message = {
+            'MessageBody': df.to_json(),
+            'QueueUrl': ALERT_SQS_QUEUE_URL
+        }
+        sqs.send_message(**message)
+    except Exception as e:
+        print(f"Error sending message: {e}")
+        raise
 
-# Mostly Stoop Kid just sits on his stoop and watches folks go by (when triggered by SQS), making sure they're not up to anything
+def split_dataframe(df, chunk_size=10000):  # Define a suitable chunk size
+    chunks = [df[i:i+chunk_size] for i in range(0, df.shape[0], chunk_size)]
+    return chunks
+
 def process_data(df):
-    vectorizer = TfidfVectorizer()
-    tfidf_matrix = vectorizer.fit_transform(df['text'])
-    cosine_sim = cosine_similarity(tfidf_matrix)
+    def process_small_dataframe(df):
+        # Add a timestamp to each message
+        df['timestamp'] = datetime.datetime.now()
 
-    if cosine_sim.mean() >= COSINE_SIMILARITY_THRESHOLD:
-        df["rougeL_score"] = compute_rougeL_scores(df, baseline_df)
-        baseline_df["rougeL_score"] = compute_rougeL_scores(baseline_df, baseline_df)
+        # Store the dataframe in a persistent storage system (e.g., DynamoDB or S3)
+        store_dataframe(df)
 
-        if df['rougeL_score'].mean() < ROUGE_L_THRESHOLD:
-            trigger_alert_function(df)
+        # Retrieve all messages from the last 30 seconds
+        start_time = datetime.datetime.now() - datetime.timedelta(seconds=30)
+        df_last_30_seconds = retrieve_dataframe(start_time)
 
-# Stoop Kid also make sure he's correctly configured his timeouts and number of simultaneous events; visibility timeout arbitrarily set to 60 seconds because why not, it's a POC
+        # Calculate the cosine similarity for the last 30 seconds worth of messages
+        vectorizer = TfidfVectorizer()
+        tfidf_matrix = vectorizer.fit_transform(df_last_30_seconds['text'])
+        cosine_sim = cosine_similarity(tfidf_matrix)
+
+        if cosine_sim.mean() >= COSINE_SIMILARITY_THRESHOLD:
+            df["rougeL_score"] = compute_rougeL_scores(df, baseline_df)
+            if df['rougeL_score'].mean() < ROUGE_L_THRESHOLD:
+                trigger_alert_function(df)
+
+    # Check if the DataFrame is too large to process
+    if df.memory_usage().sum() > MAX_PAYLOAD_SIZE:
+        # If it's too large, split it into smaller DataFrames
+        dfs = split_dataframe(df)
+        for i, df_chunk in enumerate(dfs):
+            try:
+                process_small_dataframe(df_chunk)
+            except Exception as e:
+                print(f"Error processing chunk: {e}")
+                raise
+    else:
+        process_small_dataframe(df)
+
 def receive_message():
     response = sqs.receive_message(
         QueueUrl=SQS_QUEUE_URL,
@@ -69,25 +97,35 @@ def receive_message():
     )
     return response
 
-# Stoop Kid likes to correctly manage his serverless function based on the configured constants, no longer bound by conditional logic i.e. "Process all the things!"
 def lambda_handler(event, context):
     while True:
-        response = receive_message()
+        try:
+            response = receive_message()
 
-        if 'Messages' in response:
-            for message in response['Messages']:
-                receipt_handle = message['ReceiptHandle']
+            if 'Messages' in response:
+                for message in response['Messages']:
+                    receipt_handle = message['ReceiptHandle']
 
-                body = json.loads(message['Body'])
-                df = pd.DataFrame(body)
+                    try:
+                        body = json.loads(message['Body'])
+                        df = pd.DataFrame(body)
 
-                process_data(df)
+                        process_data(df)
 
-                # Delete message after successful processing
-                sqs.delete_message(
-                    QueueUrl=SQS_QUEUE_URL,
-                    ReceiptHandle=receipt_handle
-                )
-        else:
-            # No more messages in the queue, terminate the function
-            break
+                        # Delete message after successful processing
+                        sqs.delete_message(
+                            QueueUrl=SQS_QUEUE_URL,
+                            ReceiptHandle=receipt_handle
+                        )
+                    except Exception as e:
+                        print(f"Error processing message: {e}")
+                        raise
+            else:
+                # No more messages in the queue, terminate the function
+                break
+        except ClientError as e:
+            print(f"Error receiving message: {e}")
+            time.sleep(2**RETRY_COUNT)  # Exponential backoff
+            RETRY_COUNT -= 1
+            if RETRY_COUNT == 0:
+                raise
