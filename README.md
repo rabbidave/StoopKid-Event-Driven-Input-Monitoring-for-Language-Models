@@ -6,7 +6,7 @@
 ![Stoop Kid](https://static.wikia.nocookie.net/heyarnold/images/a/a3/59e904f1d075f61ca93baa81.PNG/revision/latest?cb=20171105193956 "Stoop Kid")
 
 ## Description:
-A set serverless functions designed to assist in the monitoring of inputs to language models, including routine and specific inspection of the message queue, and event-driven triggering of more complex metric calculation based on configurable condidtions (assuming use of an environment variable); subsequently alerts to another SQS queue
+A set of serverless functions designed to assist in the monitoring of inputs to language models, including routine and specific inspection of the message queue, and event-driven triggering of more complex metric calculation based on configurable condidtions (assuming use of an environment variable); subsequently alerts to another SQS queue
 
 #
 ## Rationale:
@@ -19,13 +19,13 @@ A set serverless functions designed to assist in the monitoring of inputs to lan
 
 The intent of this StoopKid.py is to efficiently spin up, store and retrieve messages from an ElastiCache instance, thereby affecting a windowing function as a means to monitor the inputs to a language model. 
 
-The goal being to detect if the model is starting to experience drift from the baseline loaded ROUGE-L (which is calculated from a batch updated baseline stored in S3, calculated, and then stored in memory for reuse),
+The goal being to detect if the model is starting to experience drift from the baseline loaded ROUGE-L (which should be regularly updated and stored in S3).
     
-The ROUGE-L value is calculated intially and stored in memory; ROUGE-L is calculated for incoming messages only after comparing the cosine similarity of new messages in the dataframe to the last 5 minutes worth of messages; when complete the function spins down appropriately. 
+The ROUGE-L value is calculated intially from the baseline, and stored in memory. ROUGE-L is calculated for incoming messages only after comparing the cosine similarity of new messages in the dataframe to the last 5 minutes worth of messages; when complete the function spins down appropriately. 
 
-The cosine similarity is used as a heuristic to detect similar inputs within the incoming dataframes to the last 5 minutes worth of messages (ostensibly to identify either poor generalization or attack), and the ROUGE-L score is used to more precisely compare the inputs with a baseline dataset; as a means of validating the first test. 
+The cosine similarity is used as a heuristic to detect similar inputs within the incoming dataframes to the last 5 minutes worth of messages (ostensibly to identify either poor generalization or attack), and the ROUGE-L score is used to more precisely compare the inputs with a baseline dataset; as a means of validating the assumption of the first function. 
 
 If new inputs are found to be "too similar", and subsequently found to be drifting from the baseline, a message is posted to a second SQS queue for further analysis.
 
 #
-### Note: Needs logging and additional error-handling; this is mostly conceptual and assumes the use of environment variables rather than hard-coded values
+### Note: Needs logging and additional error-handling; this is mostly conceptual and assumes the use of environment variables rather than hard-coded values for cosine similarity & ROUGE-L
