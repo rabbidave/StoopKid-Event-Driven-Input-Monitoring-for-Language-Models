@@ -11,8 +11,8 @@ A set of serverless functions designed to assist in the monitoring of inputs to 
 #
 ## Rationale:
 
-1) Large Language Models are subject to various forms of prompt injection (indirect or otherwise); lightweight and step-wise alerting of similar prompts compared to a baseline help your application stay secure
-2) User experience is crucial to the adoption of LLMs for orchestration of multi-modal agentic systems; a high cosine similarity paired with a low rouge-L could indicate poor generalization, not just an attack
+1) Large Language Models are [subject to various forms of prompt injection](https://github.com/greshake/llm-security) ([indirect](https://github.com/greshake/llm-security#compromising-llms-using-indirect-prompt-injection) or otherwise); lightweight and step-wise alerting of similar prompts compared to a baseline help your application stay secure
+2) User experience, instrumentation, and metadata capture are crucial to the adoption of LLMs for orchestration of [multi-modal agentic systems](https://en.wikipedia.org/wiki/Multi-agent_system); a high cosine similarity paired with a low rouge-L could indicate poor generalization, better prompt engineering for users, and/or an attack on the system
 
 #
 ## Intent:
