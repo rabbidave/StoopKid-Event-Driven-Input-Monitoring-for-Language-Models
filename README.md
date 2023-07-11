@@ -6,7 +6,7 @@
 ![Stoop Kid](https://static.wikia.nocookie.net/heyarnold/images/a/a3/59e904f1d075f61ca93baa81.PNG/revision/latest?cb=20171105193956 "Stoop Kid")
 
 ## Description:
-A set of serverless functions designed to assist in the monitoring of inputs to language models, including routine and specific inspection of the message queue, and event-driven triggering of more complex metric calculation based on configurable condidtions (assuming use of an environment variable); subsequently alerts to another SQS queue
+A set of serverless functions designed to assist in the monitoring of inputs to language models, including routine and specific inspection of the message queue, and event-driven triggering of more complex metric calculation based on continually configurable values (assuming use of an environment variable); subsequently alerts to another SQS queue
 
 #
 ## Rationale:
