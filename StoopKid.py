@@ -21,8 +21,9 @@ S3_BUCKET_NAME = 'my-bucket'
 BASELINE_FILE_KEY = 'baseline.csv'
 MAX_PAYLOAD_SIZE = 1000000  # Define a suitable max payload size
 RETRY_COUNT = 3  # Define a suitable retry count
-REDIS_HOST = 'localhost'  # Replace with your Redis host
-REDIS_PORT = 6379  # Replace with your Redis port
+REDIS_HOST = 'myelasticachecluster.eaorz8.ng.0001.use1.cache.amazonaws.com'  # Replace with your ElastiCache host
+REDIS_PORT = 6379  # Replace with your ElastiCache port
+
 
 # Initialize boto3 and redis clients
 s3 = boto3.client('s3')
