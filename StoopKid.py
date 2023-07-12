@@ -1,3 +1,7 @@
+# My thanks to the open-source community; LLMs brought about a GNU revival
+# My thanks to Arize AI in particular; y'all inspired this and other utilities with an awesome observability platform & sessions
+# Note: This Lambda has a timeout to ensure it's spun down gracefully; manage your Lambda with Provisioned Concurrency to ensure SQS messages don't get missed
+
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -126,7 +130,13 @@ def receive_message():
     return response
 
 def lambda_handler(event, context):
+    start_time = time.time()
+
     while True:
+        # Check if 10 minutes have passed
+        if time.time() - start_time > 600:
+            break
+
         try:
             response = receive_message()
 
@@ -146,14 +156,15 @@ def lambda_handler(event, context):
                             ReceiptHandle=receipt_handle
                         )
                     except Exception as e:
-                        print(f"Error processing message: {e}")
+                        print(f'Error processing message: {e}')
                         raise
             else:
                 # No more messages in the queue, terminate the function
                 break
         except ClientError as e:
-            print(f"Error receiving message: {e}")
+            print(f'Error receiving message: {e}')
             time.sleep(2**RETRY_COUNT)  # Exponential backoff
             RETRY_COUNT -= 1
             if RETRY_COUNT == 0:
                 raise
+
